@@ -1,0 +1,387 @@
+// -*- C++ -*-
+//
+// Package:     HLTElectronOfflineAnalyzer
+// Class:       HLTElectronOfflineAnalyzer
+// 
+
+// system include files
+#include <memory>
+#include <iostream>
+
+// user include files
+#include "DQMServices/Core/interface/DQMStore.h"
+
+#include "FWCore/Utilities/interface/EDGetToken.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "DQMServices/Core/interface/MonitorElement.h"
+#include "DQMServices/Core/interface/DQMEDAnalyzer.h"
+#include "FWCore/Framework/interface/ConsumesCollector.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+
+
+#include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectronFwd.h"
+
+#include "HLTrigger/HLTcore/interface/HLTConfigProvider.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+
+
+#include "TFile.h"
+#include "TDirectory.h"
+#include "TPRegexp.h"
+
+class GenericTriggerEventFlag;
+
+//////////////////////////////////////////////////////////////////////////////
+//////// Define the interface ////////////////////////////////////////////////
+
+
+struct MEbinning {
+  int nbins;
+  double xmin;
+  double xmax;
+};
+
+struct ME4eff {
+  MonitorElement* numerator;
+  MonitorElement* denominator;
+};
+
+
+class HLTElectronOfflineAnalyzer : public DQMEDAnalyzer {
+
+public:
+
+  explicit HLTElectronOfflineAnalyzer(const edm::ParameterSet&);
+  ~HLTElectronOfflineAnalyzer();
+private:
+
+  // Analyzer Methods
+  virtual void beginJob();
+  virtual void dqmBeginRun(const edm::Run &, const edm::EventSetup &) override;
+  virtual void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;  
+  virtual void analyze(const edm::Event &, const edm::EventSetup &) override;
+  virtual void endRun(const edm::Run &, const edm::EventSetup &) override;
+  virtual void endJob();
+
+  // Extra Methods
+  std::vector<std::string> moduleLabels(std::string);
+
+  protected:
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, int& nbins, double& xmin, double& xmax);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binningX);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, double& ymin, double& ymax);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, int& nbinsY, double& ymin, double& ymax);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binningX, std::vector<double> binningY);
+   void setMETitle(ME4eff& me, std::string titleX, std::string titleY);
+
+  private:
+   static MEbinning getHistoPSet    (edm::ParameterSet pset);
+   static MEbinning getHistoLSPSet  (edm::ParameterSet pset);
+
+  // Input from Configuration File
+  edm::ParameterSet pset_;
+  std::string hltProcessName_;
+  std::vector<std::string> hltPathsToCheck_;
+
+  // generic trigger event flag for selecting events based on DCS flag (it can be used for selection based on L1 and HLT trigger results as well ....)
+  GenericTriggerEventFlag* genTriggerEventFlagDCS_;
+
+
+  // Member Variables
+  HLTConfigProvider hltConfig_;
+
+  std::string folderName_;
+
+  edm::EDGetTokenT<reco::GsfElectronCollection> eleToken_;
+
+  // monitor element
+  std::vector<double> pt_variable_binning_;
+  MEbinning           pt_binning_;
+  std::vector<double> eta_variable_binning_;
+  MEbinning           eta_binning_;
+  MEbinning           ls_binning_;
+
+  ME4eff ptME_;
+  ME4eff ptME_variableBinning_;
+  ME4eff ptVsLS_;
+  ME4eff etaME_;
+  ME4eff etaME_variableBinning_;
+  ME4eff phiME_;
+  
+};
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//////// Namespaces, Typedefs, and Constants /////////////////////////////////
+
+using namespace std;
+using namespace edm;
+using namespace reco;
+using namespace trigger;
+
+typedef vector<string> vstring;
+
+#include "CommonTools/TriggerUtils/interface/GenericTriggerEventFlag.h"
+
+double MAX_PHI = 3.2;
+int N_PHI = 64;
+MEbinning phi_binning_{
+  N_PHI, -MAX_PHI, MAX_PHI
+};
+
+//////////////////////////////////////////////////////////////////////////////
+//////// Class Methods ///////////////////////////////////////////////////////
+
+HLTElectronOfflineAnalyzer::HLTElectronOfflineAnalyzer(const ParameterSet& iConfig)
+  : pset_(iConfig)
+  , hltProcessName_  (iConfig.getParameter<string>("hltProcessName")  )
+  , hltPathsToCheck_ (iConfig.getParameter<vstring>("hltPathsToCheck"))
+  , genTriggerEventFlagDCS_(new GenericTriggerEventFlag(iConfig.getParameter<edm::ParameterSet>("genericTriggerEventDCSPSet"),consumesCollector(), *this))
+  , folderName_            ( iConfig.getParameter<std::string>("FolderName") )
+  , eleToken_              ( mayConsume<reco::GsfElectronCollection>(iConfig.getParameter<edm::InputTag>("electrons") ) )   
+{
+
+}
+
+HLTElectronOfflineAnalyzer::~HLTElectronOfflineAnalyzer()
+{
+  if (genTriggerEventFlagDCS_) delete genTriggerEventFlagDCS_;  
+}
+
+vector<string> 
+HLTElectronOfflineAnalyzer::moduleLabels(string path) 
+{
+
+  vector<string> modules = hltConfig_.moduleLabels(path);
+  vector<string>::iterator iter = modules.begin();
+  while (iter != modules.end()){
+    if ((iter->find("Filtered") == string::npos)&&(iter->find("hltL1s") == string::npos)){
+      iter = modules.erase(iter);
+    }
+    else if (iter->find("L1Filtered0") != string::npos)
+      iter = modules.erase(iter);
+    else ++iter;
+  }
+  
+  return modules;
+  
+}
+
+MEbinning HLTElectronOfflineAnalyzer::getHistoPSet(edm::ParameterSet pset)
+{
+  return MEbinning{
+    pset.getParameter<int32_t>("nbins"),
+      pset.getParameter<double>("xmin"),
+      pset.getParameter<double>("xmax"),
+      };
+}
+
+MEbinning HLTElectronOfflineAnalyzer::getHistoLSPSet(edm::ParameterSet pset)
+{
+  return MEbinning{
+    pset.getParameter<int32_t>("nbins"),
+      0.,
+      double(pset.getParameter<int32_t>("nbins"))
+      };
+}
+
+void HLTElectronOfflineAnalyzer::setMETitle(ME4eff& me, std::string titleX, std::string titleY)
+{
+  me.numerator->setAxisTitle(titleX,1);
+  me.numerator->setAxisTitle(titleY,2);
+  me.denominator->setAxisTitle(titleX,1);
+  me.denominator->setAxisTitle(titleY,2);
+
+}
+
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, int& nbins, double& min, double& max)
+{
+  me.numerator   = ibooker.book1D(histname+"_numerator",   histtitle+" (numerator)",   nbins, min, max);
+  me.denominator = ibooker.book1D(histname+"_denominator", histtitle+" (denominator)", nbins, min, max);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binning)
+{
+  int nbins = binning.size()-1;
+  std::vector<float> fbinning(binning.begin(),binning.end());
+  float* arr = &fbinning[0];
+  me.numerator   = ibooker.book1D(histname+"_numerator",   histtitle+" (numerator)",   nbins, arr);
+  me.denominator = ibooker.book1D(histname+"_denominator", histtitle+" (denominator)", nbins, arr);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, double& ymin, double& ymax)
+{
+  me.numerator   = ibooker.bookProfile(histname+"_numerator",   histtitle+" (numerator)",   nbinsX, xmin, xmax, ymin, ymax);
+  me.denominator = ibooker.bookProfile(histname+"_denominator", histtitle+" (denominator)", nbinsX, xmin, xmax, ymin, ymax);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, int& nbinsY, double& ymin, double& ymax)
+{
+  me.numerator   = ibooker.book2D(histname+"_numerator",   histtitle+" (numerator)",   nbinsX, xmin, xmax, nbinsY, ymin, ymax);
+  me.denominator = ibooker.book2D(histname+"_denominator", histtitle+" (denominator)", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binningX, std::vector<double> binningY)
+{
+  int nbinsX = binningX.size()-1;
+  std::vector<float> fbinningX(binningX.begin(),binningX.end());
+  float* arrX = &fbinningX[0];
+  int nbinsY = binningY.size()-1;
+  std::vector<float> fbinningY(binningY.begin(),binningY.end());
+  float* arrY = &fbinningY[0];
+
+  me.numerator   = ibooker.book2D(histname+"_numerator",   histtitle+" (numerator)",   nbinsX, arrX, nbinsY, arrY);
+  me.denominator = ibooker.book2D(histname+"_denominator", histtitle+" (denominator)", nbinsX, arrX, nbinsY, arrY);
+}
+
+
+void 
+HLTElectronOfflineAnalyzer::dqmBeginRun(const edm::Run & iRun, 
+					const edm::EventSetup & iSetup) 
+{
+
+  // Initialize hltConfig
+  bool changedConfig;
+  if (!hltConfig_.init(iRun, iSetup, hltProcessName_, changedConfig)) {
+    LogError("HLTElectronVal") << "Initialization of HLTConfigProvider failed!!"; 
+    return;
+  }
+
+  // Get the set of trigger paths we want to make plots for
+  set<string> hltPaths;
+  for (size_t i = 0; i < hltPathsToCheck_.size(); i++) {
+    TPRegexp pattern(hltPathsToCheck_[i]);
+    for (size_t j = 0; j < hltConfig_.triggerNames().size(); j++)
+      if (TString(hltConfig_.triggerNames()[j]).Contains(pattern))
+        hltPaths.insert(hltConfig_.triggerNames()[j]);
+  }
+  
+  // Initialize the plotters
+  set<string>::iterator iPath;
+  vector<string>::const_iterator ilabel;
+  for (iPath = hltPaths.begin(); iPath != hltPaths.end(); iPath++) {
+    string path = * iPath;
+    vector<string> labels = moduleLabels(path);
+    //    bool isLastLabel = false;
+    for (ilabel = labels.begin(); ilabel != labels.end(); ilabel++) {
+      //      if (*ilabel == labels.back()) isLastLabel = true;
+      //      plotterContainer_.addPlotter(pset_, path, *ilabel,isLastLabel);
+    }
+  }
+
+}
+
+
+
+void 
+HLTElectronOfflineAnalyzer::bookHistograms(DQMStore::IBooker & iBooker, 
+					   edm::Run const & iRun, edm::EventSetup const & iSetup)
+{
+
+  std::string histname, histtitle;
+
+  std::string currentFolder = folderName_ ;
+  iBooker.setCurrentFolder(currentFolder.c_str());
+
+  histname = "pt"; histtitle = "Gsf electron p_{T}";
+  bookME(iBooker,ptME_,histname,histtitle,pt_binning_.nbins,pt_binning_.xmin, pt_binning_.xmax);
+  setMETitle(ptME_,"Gsf electron p_{T} [GeV]","events / [GeV]");
+
+  histname = "pt_variable"; histtitle = "Gsf electron p_{T}";
+  bookME(iBooker,ptME_variableBinning_,histname,histtitle,pt_variable_binning_);
+  setMETitle(ptME_variableBinning_,"Gsf electron p_{T} [GeV]","events / [GeV]");
+
+  histname = "ptVsLS"; histtitle = "Gsf electron p_{T} vs LS";
+  bookME(iBooker,ptVsLS_,histname,histtitle,ls_binning_.nbins, ls_binning_.xmin, ls_binning_.xmax,pt_binning_.xmin, pt_binning_.xmax);
+  setMETitle(ptVsLS_,"LS","Gsf electron p_{T} [GeV]");
+
+  histname = "phi"; histtitle = "Gsf electron #phi";
+  bookME(iBooker,phiME_,histname,histtitle, phi_binning_.nbins, phi_binning_.xmin, phi_binning_.xmax);
+  setMETitle(phiME_,"Gsf electron #phi","events / 0.1 rad");
+
+  histname = "eta"; histtitle = "Gsf electron #eta";
+  bookME(iBooker,etaME_,histname,histtitle,eta_binning_.nbins,eta_binning_.xmin, eta_binning_.xmax);
+  setMETitle(etaME_,"Gsf electron #eta","events");
+
+  histname = "eta_variable"; histtitle = "Gsf electron #eta";
+  bookME(iBooker,etaME_variableBinning_,histname,histtitle,eta_variable_binning_);
+  setMETitle(etaME_variableBinning_,"Gsf electron #eta","events");
+  //  plotterContainer_.beginRun(iBooker, iRun, iSetup);
+
+  // Initialize the GenericTriggerEventFlag
+  if ( genTriggerEventFlagDCS_ && genTriggerEventFlagDCS_->on() ) genTriggerEventFlagDCS_->initRun( iRun, iSetup );
+
+}
+
+
+
+void
+HLTElectronOfflineAnalyzer::analyze(const Event& iEvent, 
+				    const EventSetup& iSetup)
+{
+  // Filter out events if Trigger Filtering is requested
+  if (genTriggerEventFlagDCS_->on() && ! genTriggerEventFlagDCS_->accept( iEvent, iSetup) ) return;    
+
+  edm::Handle<reco::GsfElectronCollection> eleHandle;
+  iEvent.getByToken( eleToken_, eleHandle );
+  //  for ( auto const & e : *eleHandle ) {
+  //    float pt = e.pt();
+  //  }
+
+  float pt  = eleHandle->at(0).pt();
+  float eta = eleHandle->at(0).eta();
+  float phi = eleHandle->at(0).phi();
+
+  ptME_.denominator -> Fill(pt);
+  ptME_.numerator   -> Fill(pt);
+
+  ptME_variableBinning_.denominator -> Fill(pt);
+  ptME_variableBinning_.numerator   -> Fill(pt);
+
+  phiME_.denominator -> Fill(phi);
+  phiME_.numerator   -> Fill(phi);
+
+  etaME_.denominator -> Fill(eta);
+  etaME_.numerator   -> Fill(eta);
+
+  etaME_variableBinning_.denominator -> Fill(eta);
+  etaME_variableBinning_.numerator   -> Fill(eta);
+
+  int ls = iEvent.id().luminosityBlock();
+  ptVsLS_.denominator -> Fill(ls, pt);
+  ptVsLS_.numerator   -> Fill(ls, pt);
+  //  plotterContainer_.analyze(iEvent, iSetup);
+
+}
+
+
+
+void 
+HLTElectronOfflineAnalyzer::beginJob()
+{
+  
+}
+
+
+
+void 
+HLTElectronOfflineAnalyzer::endRun(const edm::Run & iRun, 
+			       const edm::EventSetup& iSetup)
+{
+
+  //   plotterContainer_.endRun(iRun, iSetup);
+
+}
+
+
+
+void 
+HLTElectronOfflineAnalyzer::endJob()
+{
+  
+}
+
+
+
+//define this as a plug-in
+DEFINE_FWK_MODULE(HLTElectronOfflineAnalyzer);

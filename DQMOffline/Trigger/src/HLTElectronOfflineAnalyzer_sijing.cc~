@@ -1,0 +1,684 @@
+// -*- C++ -*-
+//
+// Package:     HLTElectronOfflineAnalyzer
+// Class:       HLTElectronOfflineAnalyzer
+// \Sijing Zhang: 2017/05/24 only the error of "moduleLabel_", everything in this code;
+
+// system include files
+#include <memory>
+#include <iostream>
+
+// user include files
+#include "DQMServices/Core/interface/DQMStore.h"
+#include "FWCore/Utilities/interface/EDGetToken.h"
+#include "FWCore/Framework/interface/Frameworkfwd.h"
+#include "DQMServices/Core/interface/MonitorElement.h"
+#include "DQMServices/Core/interface/DQMEDAnalyzer.h"
+#include "FWCore/Framework/interface/ConsumesCollector.h"
+#include "FWCore/Framework/interface/Event.h"
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/Utilities/interface/InputTag.h"
+#include "DataFormats/Common/interface/Handle.h"
+
+#include "DataFormats/HLTReco/interface/TriggerEvent.h"
+#include "DataFormats/HLTReco/interface/TriggerEventWithRefs.h"
+#include "DataFormats/Common/interface/TriggerResults.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectron.h"
+#include "DataFormats/EgammaCandidates/interface/GsfElectronFwd.h"
+
+#include "DataFormats/BeamSpot/interface/BeamSpot.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
+#include "DataFormats/VertexReco/interface/VertexFwd.h"
+#include "DataFormats/Math/interface/LorentzVector.h"
+#include "DataFormats/Math/interface/deltaR.h"
+
+#include "DataFormats/HLTReco/interface/TriggerObject.h"
+#include "CommonTools/Utils/interface/StringCutObjectSelector.h"
+#include "HLTrigger/HLTcore/interface/HLTConfigProvider.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
+
+
+#include "TFile.h"
+#include "TDirectory.h"
+#include "TPRegexp.h"
+
+
+const double NOMATCH = 999.;
+class GenericTriggerEventFlag;
+
+//////////////////////////////////////////////////////////////////////////////
+//////// Define the interface ////////////////////////////////////////////////
+
+
+struct MEbinning {
+  int nbins;
+  double xmin;
+  double xmax;
+};
+
+struct ME4eff {
+  MonitorElement* numerator;
+  MonitorElement* denominator;
+};
+
+// inheritance from class DQMAnalyzer;
+class HLTElectronOfflineAnalyzer : public DQMEDAnalyzer {
+
+public:
+
+  explicit HLTElectronOfflineAnalyzer(const edm::ParameterSet&);
+  ~HLTElectronOfflineAnalyzer();
+
+private:
+  // Analyzer Methods
+  virtual void beginJob();
+  virtual void dqmBeginRun(const edm::Run &, const edm::EventSetup &) override;
+  virtual void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;  
+  virtual void analyze(const edm::Event &, const edm::EventSetup &) override;
+  virtual void endRun(const edm::Run &, const edm::EventSetup &) override;
+  virtual void endJob();
+
+  // Extra Methods
+  std::vector<std::string> moduleLabels(std::string);
+
+  protected:
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, int& nbins, double& xmin, double& xmax);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binningX);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, double& ymin, double& ymax);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, int& nbinsY, double& ymin, double& ymax);
+   void bookME(DQMStore::IBooker &, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binningX, std::vector<double> binningY);
+   void setMETitle(ME4eff& me, std::string titleX, std::string titleY);
+
+   reco::GsfElectronCollection selectedGsfElectrons(
+          const reco::GsfElectronCollection &
+        , const reco::BeamSpot &
+        , bool
+        , const StringCutObjectSelector<reco::GsfElectron> &); 
+
+   template <class T1, class T2> std::vector<size_t>
+      matchByDeltaR(const std::vector<T1> &, const std::vector<T2> &,
+          const double maxDeltaR = NOMATCH);
+
+   trigger::TriggerObjectCollection selectedTriggerObjects(
+        const trigger::TriggerObjectCollection &,
+        const trigger::TriggerEvent &,
+        bool hasTriggerCuts,
+        const StringCutObjectSelector<trigger::TriggerObject> triggerSelector);
+
+  private:
+   static MEbinning getHistoPSet    (edm::ParameterSet pset);
+   static MEbinning getHistoLSPSet  (edm::ParameterSet pset);
+
+  // Input from Configuration File
+  edm::ParameterSet pset_;
+  std::string hltProcessName_;
+  std::vector<std::string> hltPathsToCheck_;
+
+  edm::ParameterSet targetParams_;
+  edm::ParameterSet probeParams_;
+
+//  std::string moduleLabel_;
+  // generic trigger event flag for selecting events based on DCS flag (it can be used for selection based on L1 and HLT trigger results as well ....)
+  GenericTriggerEventFlag* genTriggerEventFlagDCS_;
+
+
+  // Member Variables
+  HLTConfigProvider hltConfig_;
+
+  std::string folderName_;
+
+  edm::EDGetTokenT<reco::GsfElectronCollection> eleToken_;
+  edm::EDGetTokenT<reco::BeamSpot> bsToken_;
+  edm::EDGetTokenT<reco::VertexCollection> pvToken_;
+
+  edm::EDGetTokenT<trigger::TriggerEvent> trigSummaryToken_;
+  edm::EDGetTokenT<edm::TriggerResults>   trigResultsToken_;
+  
+  bool hasTargetRecoCuts;
+  bool hasProbeRecoCuts;
+ 
+  StringCutObjectSelector<reco::GsfElectron> targetElectronSelector_;
+  StringCutObjectSelector<reco::GsfElectron> probeElectronSelector_;
+  StringCutObjectSelector<trigger::TriggerObject> triggerSelector_;
+  bool hasTriggerCuts_;
+
+  // monitor element
+  std::vector<double> pt_variable_binning_;
+  MEbinning           pt_binning_;
+  std::vector<double> eta_variable_binning_;
+  MEbinning           eta_binning_;
+  MEbinning           ls_binning_;
+
+  ME4eff ptME_;
+  ME4eff ptME_variableBinning_;
+  ME4eff ptVsLS_;
+  ME4eff etaME_;
+  ME4eff etaME_variableBinning_;
+  ME4eff phiME_;
+  
+};
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//////// Namespaces, Typedefs, and Constants /////////////////////////////////
+
+using namespace std;
+using namespace edm;
+using namespace reco;
+using namespace trigger;
+
+typedef vector<string> vstring;
+
+#include "CommonTools/TriggerUtils/interface/GenericTriggerEventFlag.h"
+
+double MAX_PHI = 3.2;
+int N_PHI = 64;
+MEbinning phi_binning_{
+  N_PHI, -MAX_PHI, MAX_PHI
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
+//////// Class Methods ///////////////////////////////////////////////////////
+
+HLTElectronOfflineAnalyzer::HLTElectronOfflineAnalyzer(const ParameterSet& iConfig, string moduleLabel)
+  : pset_(iConfig)
+  , hltProcessName_  (iConfig.getParameter<string>("hltProcessName")  )
+  , hltPathsToCheck_ (iConfig.getParameter<vstring>("hltPathsToCheck"))
+  , targetParams_(iConfig.getParameterSet("targetParams"))
+  , probeParams_(iConfig.getParameterSet("probeParams"))
+//  , moduleLabel_(moduleLabel)
+  , genTriggerEventFlagDCS_(new GenericTriggerEventFlag(iConfig.getParameter<edm::ParameterSet>("genericTriggerEventDCSPSet"),consumesCollector(), *this))
+  , folderName_    ( iConfig.getParameter<std::string>("FolderName") )
+  
+/*
+  , inputTags (iConfig.getParameter<ParameterSet>("inputTags"))
+  , sumTag  (inputTags.getParameter<InputTag>("triggerSummary"))
+  , resTag  (inputTags.getParameter<InputTag>("triggerResults"))
+  , trigSummaryToken_   ( iConfig.consumes<TriggerEvent>(sumTag))
+  , trigResultsToken_   ( iConfig.consumes<TriggerResults>(resTag))
+
+  , eleToken_           ( iConfig.mayConsume<reco::GsfElectronCollection>(inputTags.getParameter<InputTag>("electrons") ) )   
+  , bsToken_            ( iConfig.consumes<BeamSpot>(inputTags.getParameter<InputTag>("beamSpot") ) )   
+  , pvToken_            ( iConfig.consumes<VertexCollection>(inputTags.getParameter<InputTag>("offlinePVs") ) )   
+*/
+  , hasTargetRecoCuts(targetParams_.exists("recoCuts"))
+  , hasProbeRecoCuts(probeParams_.exists("recoCuts"))
+  , targetElectronSelector_(targetParams_.getUntrackedParameter<string>("recoCuts", ""))
+  , probeElectronSelector_(probeParams_.getUntrackedParameter<string>("recoCuts", ""))
+  , triggerSelector_(targetParams_.getUntrackedParameter<string>("hltCuts",""))
+  , hasTriggerCuts_(targetParams_.exists("hltCuts"))
+{
+    ParameterSet inputTags = iConfig.getParameter<ParameterSet>("inputTags");
+    InputTag sumTag = inputTags.getParameter<InputTag>("triggerSummary");
+    InputTag resTag = inputTags.getParameter<InputTag>("triggerResults");
+    sumTag = InputTag(resTag.label(), resTag.instance(), hltProcessName_);
+    resTag = InputTag(resTag.label(), sumTag.instance(), hltProcessName_);
+
+//    trigSummaryToken_ = iConfig.consumes<TriggerEvent>(sumTag);
+  //  trigResultsToken_ = iConfig.consumes<TriggerResults>(resTag);
+    trigSummaryToken_ = consumes<TriggerEvent>(sumTag);
+    trigResultsToken_ = consumes<TriggerResults>(resTag);
+
+    eleToken_ =  mayConsume<reco::GsfElectronCollection>(inputTags.getParameter<edm::InputTag>("electrons"));
+//  , bsToken_  =  iConfig.consume<BeamSpot>(inputTags.getParameter<InputTag>("beamSpot"));
+//  , pvToken_  =  iConfig.consume<VertexCollection>(inputTags.getParameter<InputTag>("offlinePVs"));
+    bsToken_  =  consumes<reco::BeamSpot>(inputTags.getParameter<edm::InputTag>("beamSpot"));
+    pvToken_  =  consumes<VertexCollection>(inputTags.getParameter<edm::InputTag>("offlinePVs"));
+
+}
+
+
+HLTElectronOfflineAnalyzer::~HLTElectronOfflineAnalyzer()
+{
+  if (genTriggerEventFlagDCS_) delete genTriggerEventFlagDCS_;  
+}
+
+vector<string> 
+HLTElectronOfflineAnalyzer::moduleLabels(string path) 
+{
+
+  vector<string> modules = hltConfig_.moduleLabels(path); //
+  vector<string>::iterator iter = modules.begin();
+  while (iter != modules.end()){
+    if ((iter->find("Filtered") == string::npos)&&(iter->find("hltL1s") == string::npos)){
+      iter = modules.erase(iter);
+    }
+    else if (iter->find("L1Filtered0") != string::npos)
+      iter = modules.erase(iter);
+    else ++iter;
+  }
+  
+  return modules;
+  
+}
+// Muon: Line 127
+//////////////////////////////////////////////////////////////////////////////////
+
+
+
+// Mia code??
+MEbinning HLTElectronOfflineAnalyzer::getHistoPSet(edm::ParameterSet pset)
+{
+  return MEbinning{
+    pset.getParameter<int32_t>("nbins"),
+      pset.getParameter<double>("xmin"),
+      pset.getParameter<double>("xmax"),
+      };
+}
+
+MEbinning HLTElectronOfflineAnalyzer::getHistoLSPSet(edm::ParameterSet pset)
+{
+  return MEbinning{
+    pset.getParameter<int32_t>("nbins"),
+      0.,
+      double(pset.getParameter<int32_t>("nbins"))
+      };
+}
+
+void HLTElectronOfflineAnalyzer::setMETitle(ME4eff& me, std::string titleX, std::string titleY)
+{
+  me.numerator->setAxisTitle(titleX,1);
+  me.numerator->setAxisTitle(titleY,2);
+  me.denominator->setAxisTitle(titleX,1);
+  me.denominator->setAxisTitle(titleY,2);
+
+}
+
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, int& nbins, double& min, double& max)
+{
+  me.numerator   = ibooker.book1D(histname+"_numerator",   histtitle+" (numerator)",   nbins, min, max);
+  me.denominator = ibooker.book1D(histname+"_denominator", histtitle+" (denominator)", nbins, min, max);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binning)
+{
+  int nbins = binning.size()-1;
+  std::vector<float> fbinning(binning.begin(),binning.end());
+  float* arr = &fbinning[0];
+  me.numerator   = ibooker.book1D(histname+"_numerator",   histtitle+" (numerator)",   nbins, arr);
+  me.denominator = ibooker.book1D(histname+"_denominator", histtitle+" (denominator)", nbins, arr);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, double& ymin, double& ymax)
+{
+  me.numerator   = ibooker.bookProfile(histname+"_numerator",   histtitle+" (numerator)",   nbinsX, xmin, xmax, ymin, ymax);
+  me.denominator = ibooker.bookProfile(histname+"_denominator", histtitle+" (denominator)", nbinsX, xmin, xmax, ymin, ymax);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, int& nbinsX, double& xmin, double& xmax, int& nbinsY, double& ymin, double& ymax)
+{
+  me.numerator   = ibooker.book2D(histname+"_numerator",   histtitle+" (numerator)",   nbinsX, xmin, xmax, nbinsY, ymin, ymax);
+  me.denominator = ibooker.book2D(histname+"_denominator", histtitle+" (denominator)", nbinsX, xmin, xmax, nbinsY, ymin, ymax);
+}
+void HLTElectronOfflineAnalyzer::bookME(DQMStore::IBooker &ibooker, ME4eff& me, std::string& histname, std::string& histtitle, std::vector<double> binningX, std::vector<double> binningY)
+{
+  int nbinsX = binningX.size()-1;
+  std::vector<float> fbinningX(binningX.begin(),binningX.end());
+  float* arrX = &fbinningX[0];
+  int nbinsY = binningY.size()-1;
+  std::vector<float> fbinningY(binningY.begin(),binningY.end());
+  float* arrY = &fbinningY[0];
+
+  me.numerator   = ibooker.book2D(histname+"_numerator",   histtitle+" (numerator)",   nbinsX, arrX, nbinsY, arrY);
+  me.denominator = ibooker.book2D(histname+"_denominator", histtitle+" (denominator)", nbinsX, arrX, nbinsY, arrY);
+}
+
+
+void 
+HLTElectronOfflineAnalyzer::dqmBeginRun(const edm::Run & iRun, 
+					const edm::EventSetup & iSetup) 
+{
+
+  // Initialize hltConfig
+  bool changedConfig;
+  if (!hltConfig_.init(iRun, iSetup, hltProcessName_, changedConfig)) {
+    LogError("HLTElectronVal") << "Initialization of HLTConfigProvider failed!!"; 
+    return;
+  }
+
+  // Get the set of trigger paths we want to make plots for
+  set<string> hltPaths;
+  for (size_t i = 0; i < hltPathsToCheck_.size(); i++) {
+    TPRegexp pattern(hltPathsToCheck_[i]);
+    for (size_t j = 0; j < hltConfig_.triggerNames().size(); j++)
+      if (TString(hltConfig_.triggerNames()[j]).Contains(pattern))
+        hltPaths.insert(hltConfig_.triggerNames()[j]);
+  }
+  
+  set<>string> moduleLabel;
+  // Initialize the plotters  /* Muon: Line 152 */
+  set<string>::iterator iPath;
+  vector<string>::const_iterator ilabel;
+  for (iPath = hltPaths.begin(); iPath != hltPaths.end(); iPath++) {
+    string path = * iPath;
+    vector<string> labels = moduleLabels(path);
+      //  bool isLastLabel = false;
+    for (*ilabel = labels.begin(); ilabel != labels.end(); ilabel++) {
+        //    if (*ilabel == labels.back()) isLastLabel = true;
+      //      plotterContainer_.addPlotter(pset_, path, *ilabel,isLastLabel);
+    		moduleLabel = *ilabel;
+    }
+  }
+
+}
+
+GsfElectronCollection
+HLTElectronOfflineAnalyzer::selectedGsfElectrons(const GsfElectronCollection & eleHandle,
+                                                 const BeamSpot & beamSpot,
+                                                 bool  hasGsfCuts,
+                                                 const StringCutObjectSelector<reco::GsfElectron> &selector)
+{
+
+   // If there is no selector (recoCuts does not exists), return an empty collection.
+   if (!hasGsfCuts)
+        return GsfElectronCollection();
+   GsfElectronCollection reducedGsfElectrons;
+   for (auto const& e : eleHandle){   
+//     const Track * track = 0;
+
+     reducedGsfElectrons.push_back(e);
+   }
+   return reducedGsfElectrons;
+}
+      
+
+TriggerObjectCollection
+HLTElectronOfflineAnalyzer::selectedTriggerObjects(
+         const TriggerObjectCollection & triggerObjects
+        , const TriggerEvent            & triggerSummary
+        , bool hasTriggerCuts
+        , const StringCutObjectSelector<TriggerObject> triggerSelector)
+{
+   if ( !hasTriggerCuts) return TriggerObjectCollection();
+
+   InputTag filterTag(moduleLabel_, "", hltProcessName_);
+   size_t filterIndex = triggerSummary.filterIndex(filterTag);
+
+   TriggerObjectCollection selectedObjects;
+
+   if (filterIndex < triggerSummary.sizeFilters() ){
+        const Keys &keys = triggerSummary.filterKeys(filterIndex);
+        for (size_t j = 0; j < keys.size(); j++ ){
+          TriggerObject foundObject = triggerObjects[keys[j]];
+          if (triggerSelector(foundObject))
+                selectedObjects.push_back(foundObject);
+        }
+   }
+
+   return selectedObjects;
+
+}
+
+
+// A generic method to find the best deltaR matches from 2 collections.
+template <class T1, class T2>
+vector<size_t>
+HLTElectronOfflineAnalyzer::matchByDeltaR( const vector<T1> & collection1
+                                        , const vector<T2> & collection2
+                                        , const double       maxDeltaR)
+{
+
+   const size_t n1 = collection1.size();
+   const size_t n2 = collection2.size();
+
+   vector<size_t> result(n1, -1);
+   vector<vector<double> > deltaRMatrix(n1, vector<double>(n2, NOMATCH));
+
+   for (size_t i = 0; i < n1; i++)
+     for (size_t j = 0; j < n2; j++) {
+        deltaRMatrix[i][j] = deltaR(collection1[i], collection2[j]);
+     }
+
+   // Run through the matrix n1 times to make sure we've found all matches.
+   for (size_t k = 0; k < n1; k++) {
+      size_t i_min = -1;
+      size_t j_min = -1;
+      double minDeltaR = maxDeltaR;
+      // find the smallest deltaR
+      for (size_t i = 0; i < n1; i++)
+        for (size_t j = 0; j < n2; j++)
+          if (deltaRMatrix[i][j] < minDeltaR) {
+                i_min + i;
+                j_min + j;
+                minDeltaR = deltaRMatrix[i][j];
+          }
+      // If a match has been made, save it and make those candidates unavailable.
+      if (minDeltaR < maxDeltaR) {
+        result[i_min] = j_min;
+        deltaRMatrix[i_min] = vector<double>(n2, NOMATCH);
+        for (size_t i = 0; i < n1; i++)
+           deltaRMatrix[i][j_min] = NOMATCH;
+      }
+   }
+   return result;
+}
+
+
+//---- Muon: Line 169  -----
+void 
+HLTElectronOfflineAnalyzer::bookHistograms(DQMStore::IBooker & iBooker, 
+					   edm::Run const & iRun, edm::EventSetup const & iSetup)
+{
+
+  TPRegexp suffixPtCut("Ele[0-9]+$"); // for path
+
+  std::string histname, histtitle;
+  std::string currentFolder = folderName_ ;
+//  iBooker.setCurrentFolder(currentFolder.c_str());
+
+   //---- for name of surdirectory ----HLTMuonMatchAndPlot.cc  Line 92 ----
+  set<string> hltPaths;
+  for (size_t i = 0; i < hltPathsToCheck_.size(); i++) {
+    TPRegexp pattern(hltPathsToCheck_[i]);
+    for (size_t j = 0; j < hltConfig_.triggerNames().size(); j++)
+      if (TString(hltConfig_.triggerNames()[j]).Contains(pattern))
+        hltPaths.insert(hltConfig_.triggerNames()[j]);
+  }
+
+//  bool isLastLabel = false;
+  string path;
+  set<string>::iterator iPath;
+  string baseDir = folderName_; //Path Folder
+  vector<string>::const_iterator ilabel;
+  for (iPath = hltPaths.begin(); iPath != hltPaths.end(); iPath++) {
+    path = * iPath;
+    if (baseDir[baseDir.size() - 1] != '/') baseDir += '/'; 
+    string pathSansSuffix = path;
+    if (path.rfind("_v") < path.length())
+	pathSansSuffix = path.substr(0, path.rfind("_v"));
+    cout<<"pathSansSuffix = "<< pathSansSuffix <<endl;
+    iBooker.setCurrentFolder(Form("%s%s",baseDir.c_str(), pathSansSuffix.c_str() ));
+/*
+    vector<string> labels = moduleLabels(path);
+    for (ilabel = labels.begin(); ilabel != labels.end(); ilabel++) {
+            if (*ilabel == labels.back()) isLastLabel = true;
+	    moduleLabels_ = *ilabel;
+      //      plotterContainer_.addPlotter(pset_, path, *ilabel,isLastLabel);
+    }
+*/
+
+   //---- HLTMuonMatchAndPlot.cc  line 92
+/*
+   if (baseDir[baseDir.size() - 1] != '/') baseDir += '/'; 
+   string pathSansSuffix = path;
+   if (path.rfind("_v") < path.length())
+	pathSansSuffix = path.substr(0, path.rfind("_v"));
+   cout<<"pathSansSuffix = "<< pathSansSuffix <<endl;
+*/
+//   iBooker.setCurrentFolder(Form("%s%s",baseDir.c_str(), pathSansSuffix.c_str() ));
+/* 
+   if (isLastLabel)
+	iBooker.setCurrentFolder(baseDir + pathSansSuffix);
+   else
+	iBooker.setCurrentFolder(baseDir + pathSansSuffix + "/" + moduleLabels_);
+*/
+
+
+
+  histname = "pt"; histtitle = "Gsf electron p_{T}";
+  bookME(iBooker,ptME_,histname,histtitle,pt_binning_.nbins,pt_binning_.xmin, pt_binning_.xmax);
+  setMETitle(ptME_,"Gsf electron p_{T} [GeV]","events / [GeV]");
+
+  histname = "pt_variable"; histtitle = "Gsf electron p_{T}";
+  bookME(iBooker,ptME_variableBinning_,histname,histtitle,pt_variable_binning_);
+  setMETitle(ptME_variableBinning_,"Gsf electron p_{T} [GeV]","events / [GeV]");
+
+  histname = "ptVsLS"; histtitle = "Gsf electron p_{T} vs LS";
+  bookME(iBooker,ptVsLS_,histname,histtitle,ls_binning_.nbins, ls_binning_.xmin, ls_binning_.xmax,pt_binning_.xmin, pt_binning_.xmax);
+  setMETitle(ptVsLS_,"LS","Gsf electron p_{T} [GeV]");
+
+  histname = "phi"; histtitle = "Gsf electron #phi";
+  bookME(iBooker,phiME_,histname,histtitle, phi_binning_.nbins, phi_binning_.xmin, phi_binning_.xmax);
+  setMETitle(phiME_,"Gsf electron #phi","events / 0.1 rad");
+
+  histname = "eta"; histtitle = "Gsf electron #eta";
+  bookME(iBooker,etaME_,histname,histtitle,eta_binning_.nbins,eta_binning_.xmin, eta_binning_.xmax);
+  setMETitle(etaME_,"Gsf electron #eta","events");
+
+  histname = "eta_variable"; histtitle = "Gsf electron #eta";
+  bookME(iBooker,etaME_variableBinning_,histname,histtitle,eta_variable_binning_);
+  setMETitle(etaME_variableBinning_,"Gsf electron #eta","events");
+}
+
+  //  plotterContainer_.beginRun(iBooker, iRun, iSetup);
+
+  // Initialize the GenericTriggerEventFlag
+  if ( genTriggerEventFlagDCS_ && genTriggerEventFlagDCS_->on() ) genTriggerEventFlagDCS_->initRun( iRun, iSetup );
+
+}
+
+
+
+void
+HLTElectronOfflineAnalyzer::analyze(const Event& iEvent, 
+				    const EventSetup& iSetup)
+{
+
+
+   float pt =-999.;
+   float eta =-999.;
+   float phi =-999.;
+
+
+  // Filter out events if Trigger Filtering is requested
+  if (genTriggerEventFlagDCS_->on() && ! genTriggerEventFlagDCS_->accept( iEvent, iSetup) ) return;    
+
+  Handle<TriggerEvent> triggerSummary;
+  iEvent.getByToken(trigSummaryToken_, triggerSummary);
+  if(!triggerSummary.isValid()){
+     LogError("HLTElectronOfflineAnalyzer")<<"Missing triggerSummary collection"<< endl;
+  }
+
+  Handle<TriggerResults> triggerResults;
+  iEvent.getByToken(trigResultsToken_, triggerResults);
+  if(!triggerResults.isValid()){
+     LogError("HLTElectronOfflineAnalyzer")<<"Missing triggerResults collection"<< endl;
+  }
+
+  edm::Handle<reco::GsfElectronCollection> eleHandle;
+  iEvent.getByToken( eleToken_, eleHandle );
+  if(!eleHandle.isValid()){
+     LogError("HLTElectronOfflineAnalyzer")<<"Missing eleHandle collection"<< endl;
+  }
+
+  Handle<BeamSpot> beamSpot;
+  iEvent.getByToken(bsToken_, beamSpot);
+  if(!beamSpot.isValid()){
+     LogError("HLTElectronOfflineAnalyzer")<<"Missing beam Spot collection"<< endl;
+  }
+
+  Handle<VertexCollection> vertices;
+  iEvent.getByToken(pvToken_, vertices);
+  if(!vertices.isValid()){
+     LogError("HLTElectronOfflineAnalyzer")<<"Missing vertices collection"<< endl;
+  }
+
+//  for ( auto const & e : *eleHandle ) {
+//      float pt = e.pt();
+//    }
+
+  //checking the output
+//  std::cout<< "before eleHandle->at(0)" << std::endl;
+  //float pt  = eleHandle->at(0).pt();
+  //std::cout<< "after eleHandle->at(0)" << std::endl;
+  //float eta = eleHandle->at(0).eta();
+  //float phi = eleHandle->at(0).phi();
+  if(eleHandle->size() == 0){
+	  std::cout<< "no electrons in this event" << std::endl;
+  }else if(eleHandle->size() != 0){
+	  std::cout<< "the number of electrons is "<< eleHandle->size() << std::endl;
+
+    	  pt  = eleHandle->at(0).pt(); // pt of eleHandle[0];
+	  std::cout<< "pt = "<< pt << std::endl;
+	  eta  = eleHandle->at(0).eta();
+	  std::cout<< "eta = "<< eta << std::endl;
+	  phi  = eleHandle->at(0).phi();
+	  std::cout<< "phi = "<< phi << std::endl;
+  }
+
+   GsfElectronCollection targetElectrons = selectedGsfElectrons(* eleHandle, * beamSpot, hasTargetRecoCuts, targetElectronSelector_);
+   GsfElectronCollection probeElectrons  = selectedGsfElectrons(* eleHandle, * beamSpot, hasProbeRecoCuts, probeElectronSelector_);
+   TriggerObjectCollection allTriggerObjects = triggerSummary->getObjects();
+   TriggerObjectCollection hltElectrons =
+        selectedTriggerObjects(allTriggerObjects, * triggerSummary, hasTriggerCuts_, triggerSelector_);
+  
+//--- 12 variables ---- no need to change the name the variables, just add the selections; check muon code!!
+//struct ME4eff;  ME4eff ptME_;
+// ptME_.denominator : how to call the function denominator?? void Fill(double x) in MonitorElement.h;
+  ptME_.denominator -> Fill(pt); // pt of probe electron; 
+  ptME_.numerator   -> Fill(pt); // pt of tag electron;
+
+  ptME_variableBinning_.denominator -> Fill(pt);
+  ptME_variableBinning_.numerator   -> Fill(pt);
+
+  phiME_.denominator -> Fill(phi);
+  phiME_.numerator   -> Fill(phi);
+
+  etaME_.denominator -> Fill(eta);
+  etaME_.numerator   -> Fill(eta);
+
+  etaME_variableBinning_.denominator -> Fill(eta);
+  etaME_variableBinning_.numerator   -> Fill(eta);
+
+  int ls = iEvent.id().luminosityBlock();
+  ptVsLS_.denominator -> Fill(ls, pt);
+  ptVsLS_.numerator   -> Fill(ls, pt);
+//    plotterContainer_.analyze(iEvent, iSetup);
+
+
+
+
+}
+
+
+//--- Muon: Line 191  -----
+void 
+HLTElectronOfflineAnalyzer::beginJob()
+{
+  
+}
+
+
+
+void 
+HLTElectronOfflineAnalyzer::endRun(const edm::Run & iRun, 
+			       const edm::EventSetup& iSetup)
+{
+
+  //   plotterContainer_.endRun(iRun, iSetup);
+
+}
+
+
+
+void 
+HLTElectronOfflineAnalyzer::endJob()
+{
+  
+}
+
+
+
+//define this as a plug-in
+DEFINE_FWK_MODULE(HLTElectronOfflineAnalyzer);
