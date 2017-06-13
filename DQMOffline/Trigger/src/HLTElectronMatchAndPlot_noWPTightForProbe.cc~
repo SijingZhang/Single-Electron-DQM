@@ -142,29 +142,15 @@ void HLTElectronMatchAndPlot::beginRun(DQMStore::IBooker & iBooker,
     book1D(iBooker, "fakerateVertex_" + suffix, "NVertex", ";NVertex;");
     book1D(iBooker, "fakeratePhi_" + suffix, "phi", ";#phi;");
     book1D(iBooker, "fakerateTurnOn_" + suffix, "pt", ";p_{T};");
-    book2D(iBooker, "fakeratePhiVsEta_" + suffix, "eta", 
-	   "phi", ";#eta;#phi");
     
-    book1D(iBooker, "massVsmassZ_EB_" + suffix, "zMass", ";mass");
-    book1D(iBooker, "massVsEtaZ_EB_" + suffix, "etaCoarse", ";#eta");
-    book1D(iBooker, "massVsPtZ_EB_" + suffix, "ptCoarse", ";p_{T}");
-    book1D(iBooker, "massVsVertexZ_EB_" + suffix, "NVertex", ";NVertex");
-    book2D(iBooker, "massVsPhiVsEtaZ_EB_" + suffix, "etaCoarse", 
-	   "phiCoarse", ";#eta;#phi");
-    book1D(iBooker, "massVsSigmaIetaIetaZ_EB_" + suffix, "sigmaIetaIeta", ";#sigmaI#etaI#eta");
-    book1D(iBooker, "massVsHoEZ_EB_" + suffix, "HOE", ";HoE");
-    book1D(iBooker, "massVsisoPFCorrRelZ_EB_" + suffix, "isoPFCorrRel", ";isoRel");
-
-    book1D(iBooker, "massVsmassZ_EE_" + suffix, "zMass", ";mass");
-    book1D(iBooker, "massVsEtaZ_EE_" + suffix, "etaCoarse", ";#eta");
-    book1D(iBooker, "massVsPtZ_EE_" + suffix, "ptCoarse", ";p_{T}");
-    book1D(iBooker, "massVsVertexZ_EE_" + suffix, "NVertex", ";NVertex");
-    book2D(iBooker, "massVsPhiVsEtaZ_EE_" + suffix, "etaCoarse", 
-	   "phiCoarse", ";#eta;#phi");
-    book1D(iBooker, "massVsSigmaIetaIetaZ_EE_" + suffix, "sigmaIetaIeta", ";#sigmaI#etaI#eta");
-    book1D(iBooker, "massVsHoEZ_EE_" + suffix, "HOE", ";HoE");
-    book1D(iBooker, "massVsisoPFCorrRelZ_EE_" + suffix, "isoPFCorrRel", ";isoRel");
-    }
+    book1D(iBooker, "massVsEtaZ_" + suffix, "etaCoarse", ";#eta");
+//    book1D(iBooker, "massVsEtaJpsi_" + suffix, "etaCoarse", ";#eta");
+    book1D(iBooker, "massVsPtZ_" + suffix, "ptCoarse", ";p_{T}");
+//    book1D(iBooker, "massVsPtJpsi_" + suffix, "ptCoarse", ";p_{T}");
+    book1D(iBooker, "massVsVertexZ_" + suffix, "NVertex", ";NVertex");
+//    book1D(iBooker, "massVsVertexJpsi_" + suffix, "NVertex", ";NVertex");
+    
+  }
   
 }
 
@@ -281,7 +267,7 @@ cout<<"---------  Sijing : 111111  ---------"<<endl;
 
     // WP Tight(isTightElectron selection)
     float  eta = electron.superCluster()->eta();
-    float  sigmaIetaIeta = float(electron.full5x5_sigmaIetaIeta() );
+    double full5x5_sigmaIetaIeta = electron.full5x5_sigmaIetaIeta();
     float  dEtaSeedClusterTrackAtVtx  = electron.deltaEtaSeedClusterTrackAtVtx();
     double dPhiSuperClusterTrackAtVtx = electron.deltaPhiSuperClusterTrackAtVtx();
     double HOverE = electron.hadronicOverEm();
@@ -299,26 +285,23 @@ cout<<"---------  Sijing : 111111  ---------"<<endl;
     const float pho = pfIso.sumPhotonEt;
     const float eA = effectiveAreas_.getEffectiveArea( abs(eta) );
     const float Rho =  (float)(*rho);
-//    const double Pt = electron.pt();
-//    const double isoPFValueCorrRel = chad + std::max(0.0f, nhad + pho - Rho*eA);
-cout<<"HOverE = "<< HOverE <<endl;
-    const double isoPFValueCorrRel = (chad + std::max(0.0f, nhad + pho - Rho*eA)) / electron.pt();
+    float isoPFValueCorr = chad + std::max(0.0f, nhad + pho - Rho*eA);
 
     // isTightElectron selection(for both Tag and Probe)
-    if(!(( (abs(eta) <= 1.479) && sigmaIetaIeta < 0.00998 && abs(dEtaSeedClusterTrackAtVtx) < 0.00308 && abs(dPhiSuperClusterTrackAtVtx) < 0.0816 && HOverE < 0.0414 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorrRel < 0.0588)
-      || ( (abs(eta) >= 1.479) && sigmaIetaIeta < 0.0292 && (abs(dEtaSeedClusterTrackAtVtx) < 0.00605) && abs(dPhiSuperClusterTrackAtVtx) < 0.0394 && HOverE < 0.0641 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorrRel < 0.0571))) continue;
-
-// WP Tight selection criteria for only Tag electrons;
-//     if(( (abs(eta) <= 1.479) && full5x5_sigmaIetaIeta < 0.00998 && abs(dEtaSeedClusterTrackAtVtx) < 0.00308 && abs(dPhiSuperClusterTrackAtVtx) < 0.0816 && HOverE < 0.0414 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorrRel < 0.0588)  || ( (abs(eta) >= 1.479) && full5x5_sigmaIetaIeta < 0.0292 && (abs(dEtaSeedClusterTrackAtVtx) < 0.00605) && abs(dPhiSuperClusterTrackAtVtx) < 0.0394 && HOverE < 0.0641 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorrRel < 0.0571) )
+//    if(!(( (abs(eta) <= 1.479) && full5x5_sigmaIetaIeta < 0.00998 && abs(dEtaSeedClusterTrackAtVtx) < 0.00308 && abs(dPhiSuperClusterTrackAtVtx) < 0.0816 && HOverE < 0.0414 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorr < 0.0588)
+//      || ( (abs(eta) >= 1.479) && full5x5_sigmaIetaIeta < 0.0292 && (abs(dEtaSeedClusterTrackAtVtx) < 0.00605) && abs(dPhiSuperClusterTrackAtVtx) < 0.0394 && HOverE < 0.0641 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorr < 0.0571))) continue;
+     
 //    if(!isTightElectron) continue;
 //    float eta2 = electron.eta();
 //    cout<<"etaSuperClster = "<< eta1 <<endl;
 //    cout<<"etaElectron = "<< eta2 <<endl <<"---------"<<endl;
+cout<<"---------  Sijing : 2222222 ---------"<<endl;
 
     
     // Fill plots which are not efficiencies.
     if (matches[i] < targetElectrons.size()) {
     // Tag selections
+     if(( (abs(eta) <= 1.479) && full5x5_sigmaIetaIeta < 0.00998 && abs(dEtaSeedClusterTrackAtVtx) < 0.00308 && abs(dPhiSuperClusterTrackAtVtx) < 0.0816 && HOverE < 0.0414 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorr < 0.0588)  || ( (abs(eta) >= 1.479) && full5x5_sigmaIetaIeta < 0.0292 && (abs(dEtaSeedClusterTrackAtVtx) < 0.00605) && abs(dPhiSuperClusterTrackAtVtx) < 0.0394 && HOverE < 0.0641 && EInverseMinusPInverse < 0.0129 && mHits <= 1 && isPassConversionVeto && isoPFValueCorr < 0.0571) ){
       if( (abs(eta) <= 1.442 || (abs(eta) <=1.566 && abs(eta) <= 2.1)) && electron.pt() > 30){ 
        TriggerObject & hltElectron = hltElectrons[matches[i]];
        double ptRes = (electron.pt() - hltElectron.pt()) / electron.pt();
@@ -332,17 +315,16 @@ cout<<"HOverE = "<< HOverE <<endl;
 	hists_["resolutionPhi"]->Fill(phiRes);
 	N_tag++;
        }
-      } 
+      } }
     }
-cout<<"---------  Sijing : 333333 ---------"<<endl; 
+cout<<"---------  Sijing : 333333 ---------"<<endl;
     // Fill numerators and denominator for efficiency plots.
     for (size_t j = 0; j < 2; j++) {
 
       string suffix = EFFICIENCY_SUFFIXES[j];
       
       // all the Probes have to be not in the gap;
-      if ( abs(eta) > 1.442 && abs(eta) < 1.566) continue;
-      if ( electron.pt() <20) continue;
+      if ( (abs(eta) >= 1.442 && abs(eta) <= 1.566) || electron.pt() <= 20) continue;
 
       // If no match was found, then the numerator plots don't get filled.
       // numerator: passing probe, denominator: the probe;
@@ -356,13 +338,17 @@ cout<<"---------  Sijing : 333333 ---------"<<endl;
         hists_["efficiencyTurnOn_" + suffix]->Fill(electron.pt());
       }
       
+cout<<"---------  Sijing : 44444444 ---------"<<endl;
+
       if (electron.pt() > cutMinPt_ && fabs(electron.eta()) < plotCuts_["maxEta"]) {
-//        const Track * track = 0;
-//        track = & * electron.gsfTrack();
-//	if (track) 
+        const Track * track = 0;
+//        if (electron.isTighElectron()) track = & * electron.innerTrack();
+        track = & * electron.gsfTrack();
+	if (track) {
           hists_["efficiencyVertex_" + suffix]->Fill(vertices->size());
           hists_["efficiencyPhi_" + suffix]->Fill(electron.phi());
-
+          if( suffix == "denom")  N_probe++;
+	  if( suffix == "numer") N_passingprobe++;
 	  if (isLastFilter_){
 //	    double d0 = track->dxy(beamSpot->position());
 //	    double z0 = track->dz(beamSpot->position());
@@ -370,10 +356,27 @@ cout<<"---------  Sijing : 333333 ---------"<<endl;
 //	    hists_["efficiencyZ0_" + suffix]->Fill(z0);
 	    hists_["efficiencyCharge_" + suffix]->Fill(electron.charge());
 	  }
-//	
+	}
       }
     } // finish loop numerator / denominator...
     
+/*
+        const Track * track = 0;
+        if (muon.isTrackerMuon()) track = & * muon.innerTrack();
+        else if (muon.isStandAloneMuon()) track = & * muon.outerTrack();
+	if (track) {
+          hists_["efficiencyVertex_" + suffix]->Fill(vertices->size());
+          hists_["efficiencyPhi_" + suffix]->Fill(muon.phi());
+          
+	  if (isLastFilter_){
+	    double d0 = track->dxy(beamSpot->position());
+	    double z0 = track->dz(beamSpot->position());
+	    hists_["efficiencyD0_" + suffix]->Fill(d0);
+	    hists_["efficiencyZ0_" + suffix]->Fill(z0);
+	    hists_["efficiencyCharge_" + suffix]->Fill(muon.charge());
+	  }
+	}
+*/
     if (!isLastFilter_) continue;
     // Fill plots for tag and probe
     // Electron cannot be a tag because doesn't match an hlt electron     
@@ -381,78 +384,27 @@ cout<<"---------  Sijing : 333333 ---------"<<endl;
     for (size_t k = 0; k < targetElectrons.size(); k++) {
       if(k == i) continue;
       GsfElectron & theProbe = targetElectrons[k];
-      double mass = (electron.p4() + theProbe.p4()).M();
-      float eta_P = theProbe.superCluster()->eta();
-      const reco::GsfElectron::PflowIsolationVariables& pfIso_P = theProbe.pfIsolationVariables();
-      const float chad_P = pfIso_P.sumChargedHadronPt;
-      const float nhad_P = pfIso_P.sumNeutralHadronEt;
-      const float pho_P = pfIso_P.sumPhotonEt;
-      const float eA_P = effectiveAreas_.getEffectiveArea( abs(eta_P) );
-//    const float Rho =  (float)(*rho);
-      const double Pt_P = theProbe.pt()? theProbe.pt() : 1.;
-//    const double isoPFValueCorrRel = chad + std::max(0.0f, nhad + pho - Rho*eA);
       if (electron.charge() != theProbe.charge() && !pairalreadyconsidered) {
-	const double isoPFCorrRel = (chad_P + std::max(0.0f, nhad_P + pho_P - Rho*eA_P)) / Pt_P;
-	if(mass > 60 && mass < 120) {
-          if(electron.pt() < targetptCutZ_) continue; // pt>20
-	if(eta_P < 1.442){
-	  hists_["massVsmassZ_EB_denom"]->Fill(mass);
-          hists_["massVsEtaZ_EB_denom"]->Fill(theProbe.eta());
-          hists_["massVsPtZ_EB_denom"]->Fill(theProbe.pt());
-          hists_["massVsVertexZ_EB_denom"]->Fill(vertices->size());
-	  hists_["massVsPhiVsEtaZ_EB_denom"]->Fill(theProbe.eta(), theProbe.phi());
-	  hists_["massVsSigmaIetaIetaZ_EB_denom"]->Fill(theProbe.full5x5_sigmaIetaIeta());
-  	  hists_["massVsHoEZ_EB_denom"]->Fill(theProbe.hadronicOverEm());
-          hists_["massVsisoPFCorrRelZ_EB_denom"]->Fill(isoPFCorrRel);
-	}else if( eta_P > 1.566 ){
-	  hists_["massVsmassZ_EE_denom"]->Fill(mass);
-          hists_["massVsEtaZ_EE_denom"]->Fill(theProbe.eta());
-          hists_["massVsPtZ_EE_denom"]->Fill(theProbe.pt());
-          hists_["massVsVertexZ_EE_denom"]->Fill(vertices->size());
-	  hists_["massVsPhiVsEtaZ_EE_denom"]->Fill(theProbe.eta(), theProbe.phi());
-	  hists_["massVsSigmaIetaIetaZ_EE_denom"]->Fill(theProbe.full5x5_sigmaIetaIeta());
-  	  hists_["massVsHoEZ_EE_denom"]->Fill(theProbe.hadronicOverEm());
-          hists_["massVsisoPFCorrRelZ_EE_denom"]->Fill(isoPFCorrRel);
-	
-	}
-	  N_probe++;
-
-	  if(matches[k] < targetElectrons.size()) {
-	    cout<<"mass 3 = "<< mass <<endl;
-	  if(eta_P < 1.442){
-	    hists_["massVsmassZ_EB_numer"]->Fill(mass);
-            hists_["massVsEtaZ_EB_numer"]->Fill(theProbe.eta());
-            hists_["massVsPtZ_EB_numer"]->Fill(theProbe.pt());
-            hists_["massVsVertexZ_EB_numer"]->Fill(vertices->size());
-
-	    hists_["massVsPhiVsEtaZ_EB_numer"]->Fill(theProbe.eta(), theProbe.phi());
-	    hists_["massVsSigmaIetaIetaZ_EB_numer"]->Fill(theProbe.full5x5_sigmaIetaIeta());
-            hists_["massVsHoEZ_EB_numer"]->Fill(theProbe.hadronicOverEm());
-	    hists_["massVsisoPFCorrRelZ_EB_numer"]->Fill(isoPFCorrRel);
-	  } else if(eta_P > 1.566){
-	    hists_["massVsmassZ_EE_numer"]->Fill(mass);
-            hists_["massVsEtaZ_EE_numer"]->Fill(theProbe.eta());
-            hists_["massVsPtZ_EE_numer"]->Fill(theProbe.pt());
-            hists_["massVsVertexZ_EE_numer"]->Fill(vertices->size());
-
-	    hists_["massVsPhiVsEtaZ_EE_numer"]->Fill(theProbe.eta(), theProbe.phi());
-	    hists_["massVsSigmaIetaIetaZ_EE_numer"]->Fill(theProbe.full5x5_sigmaIetaIeta());
-            hists_["massVsHoEZ_EE_numer"]->Fill(theProbe.hadronicOverEm());
-	    hists_["massVsisoPFCorrRelZ_EE_numer"]->Fill(isoPFCorrRel);
-	  
-	  }
-	    //	    if( suffix == "numer") N_passingprobe++;
-	    N_passingprobe++;
-	  }  
+        double mass = (electron.p4() + theProbe.p4()).M();
+        if(mass > 60 && mass < 120) {
+          if(electron.pt() < targetptCutZ_) continue;
+          hists_["massVsEtaZ_denom"]->Fill(theProbe.eta());
+          hists_["massVsPtZ_denom"]->Fill(theProbe.pt());
+          hists_["massVsVertexZ_denom"]->Fill(vertices->size());
+          if(matches[k] < targetElectrons.size()) {
+            hists_["massVsEtaZ_numer"]->Fill(theProbe.eta());
+            hists_["massVsPtZ_numer"]->Fill(theProbe.pt());
+            hists_["massVsVertexZ_numer"]->Fill(vertices->size());
+          }  
           pairalreadyconsidered = true;
         }
       }
     } // End loop over denominator and numerator.
+
   } // End loop over targetElectrons.
   cout<<"N_tag = "<< N_tag <<endl; 
   cout<<"N_probe = "<< N_probe <<endl; 
   cout<<"N_passingprobe = "<< N_passingprobe <<endl; 
-cout<<"---------  Sijing : cout END---------"<<endl;
   
   if (!isLastFilter_) return;
   // Plot fake rates (efficiency for HLT objects to not get matched to RECO).
@@ -461,7 +413,6 @@ cout<<"---------  Sijing : cout END---------"<<endl;
                                             plotCuts_["DeltaR"]);
   for (size_t i = 0; i < hltElectrons.size(); i++) {
     TriggerObject & hltElectron = hltElectrons[i];
-//    float eta_hlt = hltElectron.eta();
     bool isFake = hltMatches[i] > hltElectrons.size();
     for (size_t j = 0; j < 2; j++) {
 
@@ -473,7 +424,6 @@ cout<<"---------  Sijing : cout END---------"<<endl;
       hists_["fakerateEta_" + suffix]->Fill(hltElectron.eta());
       hists_["fakeratePhi_" + suffix]->Fill(hltElectron.phi());
       hists_["fakerateTurnOn_" + suffix]->Fill(hltElectron.pt());
-      hists_["fakeratePhiVsEta_" + suffix]->Fill(hltElectron.eta(), hltElectron.phi());
     } // End loop over numerator and denominator.
   } // End loop over hltElectrons.
   

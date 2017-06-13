@@ -27,8 +27,8 @@
 <use   name="RecoJets/JetAlgorithms"/>
 <use   name="RecoJets/JetProducers"/>
 <use   name="JetMETCorrections/Objects"/>
-<use   name="CommonTools/TriggerUtils"/>
 <use   name="RecoEgamma/EgammaTools"/>
+
 <use   name="root"/>
 <use   name="boost"/>
 <flags   EDM_PLUGIN="1"/>

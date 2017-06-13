@@ -13,7 +13,8 @@ hltElectronOfflineAnalyzer = cms.EDAnalyzer("HLTElectronOfflineAnalyzer",
     hltPathsToCheck = cms.vstring(
       "HLT_Ele32_eta2p1_WPTight_Gsf_v8",
       "HLT_Ele32_WPTight_Gsf_v1",
-    ),
+#       "",
+      ),
 
     ## All input tags are specified in this pset for convenience
     inputTags = cms.PSet(
@@ -58,6 +59,12 @@ hltElectronOfflineAnalyzer = cms.EDAnalyzer("HLTElectronOfflineAnalyzer",
         etaCoarse = cms.untracked.vdouble(-3.0,-2.5, -2.1, -1.6, -1.2, -0.8, 0.0,
                                            0.8,  1.2,  1.6,  2.1,  2.5, 3.0),
         ptCoarse = cms.untracked.vdouble(10.0, 20.0, 40.0, 60.0, 80.0, 100.0, 200.0),
+#        sigmaIetaIeta = cms.untracked.vdouble(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+#        HOverE = cms.untracked.vdouble(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+#        isoPFValueCorrRel = cms.untracked.vdouble(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+        sigmaIetaIeta = cms.untracked.vdouble(20, 0.0, 0.05),
+        HOE          = cms.untracked.vdouble(4, 0.0, 0.08),
+        isoPFCorrRel = cms.untracked.vdouble(20, 0.0, 0.08),
         pt = cms.untracked.vdouble(  0.0,   2.0,   4.0, 
                                      6.0,   8.0,  10.0, 
                                     20.0,  30.0,  40.0, 

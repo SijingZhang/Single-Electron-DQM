@@ -69,7 +69,6 @@ private:
   //generic trigger event flag for selecting events based on DCS flag (it can be used for selection based on L1 and HLT trigger results as well...)
   GenericTriggerEventFlag* genTriggerEventFlagDCS_;
 
-
   // Member Variables
   HLTElectronMatchAndPlotContainer plotterContainer_;
   HLTConfigProvider hltConfig_;
