@@ -12,11 +12,13 @@ src/HLTElectronMatchAndPlotContainer.cc
 
 src/HLTElectronOfflineAnalyzer.cc
 
+
 configuration file:
 
 python/HLTElectronOfflineAnalyzer_cff.py
 
 python/HLTElectronOfflineAnalyzer_cfi.py
+
 
 
 header file:
@@ -26,8 +28,10 @@ interface/HLTElectronMatchAndPlot.h
 interface/HLTElectronMatchAndPlotContainer.h
 
 
+
 b. for efficiency:
 general analysis code:
+ 
  
  
 configuration file:
